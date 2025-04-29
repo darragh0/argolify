@@ -1,0 +1,36 @@
+flag v/version {
+    desc = "Show version and exit."
+    # store = true 
+}
+
+command read {
+    desc = "Read files, process them, and produce an output."
+
+    # [FILE ...]
+    pos f/files {
+        desc = "Files to process."
+        num = 1..5
+        type = path
+        # default = N/A
+        required = true 
+    }
+
+    # -n [N] | --name [NAME]
+    named n/name #"" {
+        desc = "Your username."
+        # num = 1
+        # type = string
+        # default = null
+        required = false 
+    }
+
+    # -v | --verbose
+    flag v/verbose {
+        desc = "Show verbose logging."
+        # num = 0
+        # type = bool
+        # default = false 
+        # required = false 
+    }
+
+}
