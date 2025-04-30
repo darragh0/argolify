@@ -1,3 +1,4 @@
+mod common;
 mod parser;
 mod tokenizer;
 use parser::parse;
