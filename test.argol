@@ -1,36 +1,51 @@
+!program = "proj-man";
+!version = "4.12.3";
+
 flag v/version {
-    desc = "Show version and exit."
-    # store = true 
+    desc = "Show version & exit";
+    action = show_version;
 }
 
-command read {
-    desc = "Read files, process them, and produce an output."
+flag h/help {
+    desc = "Show `proj-man` help & exit";
+    action = show_help;
+}
 
-    # [FILE ...]
-    pos f/files {
-        desc = "Files to process."
-        num = 1..5
-        type = path
-        # default = N/A
-        required = true 
+command new {
+    desc = "Create a new proj-man project";
+
+    flag h/help {
+        desc = "Show `proj-man new` help & exit";
+        action = show_help;
     }
 
-    # -n [N] | --name [NAME]
-    named n/name #"" {
-        desc = "Your username."
-        # num = 1
-        # type = string
-        # default = null
-        required = false 
+    pos name {
+        desc = "Project name";
+        required = true;
     }
 
-    # -v | --verbose
-    flag v/verbose {
-        desc = "Show verbose logging."
-        # num = 0
-        # type = bool
-        # default = false 
-        # required = false 
+    named version {
+        desc = "Initial project version";
+        default = "0.1.0";
+    }
+
+    named d/deps/dependencies {
+        desc = "Project dependencies to intstall";
+        # nargs = ..1024;
+    }
+
+    flag venv {
+        desc = "Do not create a virtual environment";
+    }
+
+    flag verbose {
+        desc = "Show verbose logging for project creation";
+        value = 3;
+    }
+
+    named color {
+        type = int;
+        options = .3, .3e-9;
     }
 
 }
