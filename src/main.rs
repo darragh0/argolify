@@ -2,6 +2,7 @@ mod ast;
 mod common;
 mod parser;
 mod tokenizer;
+
 use crate::common::errors::print_err;
 use colored::Colorize;
 use parser::parse;

@@ -1,4 +1,3 @@
-use crate::common::tokens::{TokenKind, fmt_statement_kinds};
 use colored::Colorize;
 use std::{collections::HashSet, fmt};
 
@@ -55,20 +54,22 @@ pub enum SyntaxError {
     InvalidRange(Loc, String),
     InvalidStrEsc(Loc, char),
     InvalidIdent(Loc, String),
-    InvalidFloat(Loc, String),
-    InvalidFloatExp(&'static str, Loc, String),
+    ExtraDecimalPoint(Loc, String),
+    InvalidFloatExpChars(String, Loc, String),
+    InvalidNumChars(String, String, Loc, String),
     UnterminatedStr(Loc, String),
     UnexpectedToken(Loc, String),
     NoToken(Loc, String),
+    NoFloatExp(Loc, String),
+    InvalidNumberSign(Loc, String),
+    InvalidStandaloneSymbol(Loc, String),
 }
 
 #[derive(Debug)]
 pub enum SemanticError {
     ExtraShortName(Loc, HashSet<String>),
-    DuplicateName(Loc, HashSet<String>),
+    DuplicateArgNames(Loc, HashSet<String>),
     CannotNest(Loc, String),
-    EmptyStatement(Loc),
-    DiffOptionTypes(Loc, String),
 }
 
 #[derive(Debug)]
@@ -91,22 +92,24 @@ impl fmt::Display for SemanticError {
         match self {
             Self::ExtraShortName(loc, hs) => {
                 let colored_strs: Vec<String> = hs.iter().map(|s| s.blue().to_string()).collect();
-                let joined_msg = colored_strs.join("/");
+                let joined_msg = colored_strs.join(" / ");
                 let msg = format!(
-                    "Argument can only have one short name (got {}): {}",
+                    "Argument can only have one short name: {} {} {}",
                     hs.len(),
+                    "->".bold(),
                     joined_msg
                 );
                 let fmted = fmt_semantic_err(msg, loc);
                 write!(f, "{fmted}")
             }
 
-            Self::DuplicateName(loc, hs) => {
+            Self::DuplicateArgNames(loc, hs) => {
                 let colored_str: Vec<String> = hs.iter().map(|s| s.blue().to_string()).collect();
-                let joined_msg = colored_str.join("/");
+                let joined_msg = colored_str.join(" / ");
                 let msg = format!(
-                    "Duplicate name(s) found ({}) for argument: {}",
+                    "Duplicate name(s) found ({}) for argument {} {}",
                     hs.len(),
+                    "->".bold(),
                     joined_msg
                 );
                 let fmted = fmt_semantic_err(msg, loc);
@@ -123,91 +126,118 @@ impl fmt::Display for SemanticError {
                 let fmted = fmt_semantic_err(msg, loc);
                 write!(f, "{fmted}")
             }
-
-            Self::EmptyStatement(loc) => {
-                let msg = format!(
-                    "Statement only contains commas; must include one or more of the following:{}",
-                    fmt_statement_kinds()
-                );
-                let fmted = fmt_semantic_err(msg, loc);
-                write!(f, "{fmted}")
-            }
-
-            Self::DiffOptionTypes(loc, s) => {
-                let msg = format!("Option values differ: {s}");
-                let fmted = fmt_semantic_err(msg, loc);
-                write!(f, "{fmted}")
-            }
         }
     }
 }
 
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::InvalidChar(loc, ch) => {
-                let msg = format!("Invalid character: {}", format!("'{ch}'").red());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+        let (msg, loc) = match self {
+            Self::InvalidChar(loc, ch) => (
+                format!("Illegal character {} {}", "->".bold(), ch.to_string().red()),
+                loc,
+            ),
 
-            Self::InvalidDirective(loc, s) => {
-                let msg = format!("Invalid directive: {}", s.blue());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidDirective(loc, s) => (
+                format!("Invalid directive {} {}", "->".bold(), s.blue()),
+                loc,
+            ),
 
-            Self::InvalidRange(loc, s) => {
-                let msg = format!("Invalid range syntax: {}", s.yellow());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidRange(loc, s) => (
+                format!("Invalid range syntax {} {}", "->".bold(), s.yellow()),
+                loc,
+            ),
 
-            Self::InvalidStrEsc(loc, ch) => {
-                let msg = format!(
-                    "Invalid string escape sequence: {}",
-                    format!("'\\{ch}'").red()
-                );
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidStrEsc(loc, ch) => (
+                format!(
+                    "Invalid string escape sequence {} {}",
+                    "->".bold(),
+                    format!("\\{ch}").red()
+                ),
+                loc,
+            ),
 
-            Self::InvalidIdent(loc, s) => {
-                let msg = format!("Identifier cannot start or end with '-': {}", s.blue());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidIdent(loc, s) => (
+                format!(
+                    "Identifier cannot start or end with {} {} {}",
+                    "-".red(),
+                    "->".bold(),
+                    s.blue()
+                ),
+                loc,
+            ),
 
-            Self::InvalidFloat(loc, s) => {
-                let msg = format!(
-                    "Float literal cannot contain > 1 decimal point: {}",
+            Self::ExtraDecimalPoint(loc, s) => (
+                format!(
+                    "Float literal cannot contain > 1 decimal point {} {}",
+                    "->".bold(),
                     s.yellow()
-                );
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+                ),
+                loc,
+            ),
 
-            Self::InvalidFloatExp(msg, loc, s) => {
-                let msg = format!("{msg}: {}", s.yellow());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::NoFloatExp(loc, s) => (
+                format!("Missing float exponent {} {}", "->".bold(), s.yellow()),
+                loc,
+            ),
 
-            Self::UnterminatedStr(loc, s) => {
-                let msg = format!("Unterminated string literal: {}", format!("\"{s}").green());
-                let fmted = fmt_syntax_err(msg, loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidFloatExpChars(chars, loc, s) => (
+                format!(
+                    "Float exponent contains illegal character(s): {} {} {}",
+                    chars
+                        .chars()
+                        .map(|c| c.to_string().bright_red().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    "->".bold(),
+                    s.yellow(),
+                ),
+                loc,
+            ),
 
-            Self::UnexpectedToken(loc, s) => {
-                let fmted = fmt_syntax_err(s.into(), loc);
-                write!(f, "{fmted}")
-            }
+            Self::InvalidNumChars(float_or_int, chars, loc, s) => (
+                format!(
+                    "{} contains illegal character(s): {} {} {}",
+                    float_or_int,
+                    chars
+                        .chars()
+                        .map(|c| c.to_string().bright_red().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    "->".bold(),
+                    s.yellow()
+                ),
+                loc,
+            ),
 
-            Self::NoToken(loc, s) => {
-                let fmted = fmt_syntax_err(s.into(), loc);
-                write!(f, "{fmted}")
-            }
-        }
+            Self::UnterminatedStr(loc, s) => (
+                format!(
+                    "Unterminated string literal {} {}",
+                    "->".bold(),
+                    format!("\"{s}").green()
+                ),
+                loc,
+            ),
+
+            Self::UnexpectedToken(loc, s) => (s.into(), loc),
+
+            Self::NoToken(loc, s) => (s.into(), loc),
+
+            Self::InvalidNumberSign(loc, s) => (
+                format!("Multiple signs found {} {}", "->".bold(), s.yellow()),
+                loc,
+            ),
+
+            Self::InvalidStandaloneSymbol(loc, s) => (
+                format!(
+                    "Invalid standalone symbol(s) {} {}",
+                    "->".bold(),
+                    s.yellow()
+                ),
+                loc,
+            ),
+        };
+
+        write!(f, "{}", fmt_syntax_err(msg, loc))
     }
 }

@@ -27,36 +27,36 @@ pub enum TokenKind {
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TokenKind::ExclusiveRange => "exclusive range",
-                TokenKind::InclusiveRange => "inclusive range",
-                TokenKind::Minus => "minus",
-                TokenKind::Plus => "plus",
-                TokenKind::SemiColon => "semicolon",
-                TokenKind::Action => "action",
-                TokenKind::Int => "integer",
-                TokenKind::Directive => "directive",
-                TokenKind::Float => "float",
-                TokenKind::Comma => "comma",
-                TokenKind::OpenBrace => "open brace",
-                TokenKind::CloseBrace => "close brace",
-                TokenKind::Alt => "alternative `/`",
-                TokenKind::Eq => "equal sign `=`",
-                TokenKind::Keyword => "keyword",
-                TokenKind::Boolean => "true/false",
-                TokenKind::Wildcard => "wildcard `*`",
-                TokenKind::Type => "type",
-                TokenKind::String => "string",
-                TokenKind::Identifier => "identifer",
-            }
-        )
+        write!(f, "{}", self.as_str())
     }
 }
 
 impl TokenKind {
+    fn as_str(&self) -> String {
+        match self {
+            TokenKind::ExclusiveRange => format!("exclusive range {}", "..".yellow()),
+            TokenKind::InclusiveRange => format!("inclusive range {}", "..=".yellow()),
+            TokenKind::Minus => format!("minus {}", "-".yellow()),
+            TokenKind::Plus => format!("plus {}", "+".yellow()),
+            TokenKind::SemiColon => "semicolon ;".to_string(),
+            TokenKind::Action => "action".to_string(),
+            TokenKind::Int => "integer".to_string(),
+            TokenKind::Directive => "directive".to_string(),
+            TokenKind::Float => "float".to_string(),
+            TokenKind::Comma => "comma ,".to_string(),
+            TokenKind::OpenBrace => "open brace {".to_string(),
+            TokenKind::CloseBrace => "close brace }".to_string(),
+            TokenKind::Alt => "alternative /".to_string(),
+            TokenKind::Eq => format!("equal sign {}", "=".yellow()),
+            TokenKind::Keyword => "keyword".to_string(),
+            TokenKind::Boolean => format!("{}/{}", "true".bright_red(), "false".bright_red()),
+            TokenKind::Wildcard => format!("wildcard {}", "*".yellow()),
+            TokenKind::Type => "type".to_string(),
+            TokenKind::String => "string".to_string(),
+            TokenKind::Identifier => "identifer".to_string(),
+        }
+    }
+
     pub fn help(&self) -> String {
         match self {
             TokenKind::ExclusiveRange => format!("{:20} {}", "exclusive range:", "..".yellow()),
@@ -101,7 +101,7 @@ impl TokenKind {
                 "true".bright_red(),
                 "false".bright_red()
             ),
-            TokenKind::Wildcard => format!("{:20} {}", "wildcard:", "*"),
+            TokenKind::Wildcard => format!("{:20} {}", "wildcard:", "*".yellow()),
             TokenKind::Type => format!(
                 "{:20} {} / {} / {} / {} / {}",
                 "type:",
@@ -150,13 +150,13 @@ impl Display for Token {
 impl Token {
     pub fn len(&self) -> usize {
         match self.kind {
-            TokenKind::String => self.lexeme.len() + 1,
+            TokenKind::String => self.lexeme.len() + 2,
             _ => self.lexeme.len(),
         }
     }
 }
 
-pub const STATEMENT_KINDS: [TokenKind; 9] = [
+pub const ASSIGNMENT_KINDS: [TokenKind; 9] = [
     TokenKind::String,
     TokenKind::Boolean,
     TokenKind::Float,
@@ -168,8 +168,8 @@ pub const STATEMENT_KINDS: [TokenKind; 9] = [
     TokenKind::Action,
 ];
 
-pub fn fmt_statement_kinds() -> String {
-    STATEMENT_KINDS
+pub fn fmt_assignment_kinds() -> String {
+    ASSIGNMENT_KINDS
         .iter()
         .filter_map(|s| match s {
             TokenKind::SemiColon | TokenKind::Comma => None,
@@ -178,6 +178,6 @@ pub fn fmt_statement_kinds() -> String {
         .collect::<String>()
 }
 
-pub fn is_statement_kind(kind: &TokenKind) -> bool {
-    STATEMENT_KINDS.contains(kind)
+pub fn is_assignment_kind(kind: &TokenKind) -> bool {
+    ASSIGNMENT_KINDS.contains(kind)
 }

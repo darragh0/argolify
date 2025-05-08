@@ -1,12 +1,11 @@
 !program = "proj-man";
-!version = "4.12.3";
 
 flag v/version {
     desc = "Show version & exit";
     action = show_version;
 }
 
-flag h/help {
+flag h/help/usage {
     desc = "Show `proj-man` help & exit";
     action = show_help;
 }
@@ -40,12 +39,12 @@ command new {
 
     flag verbose {
         desc = "Show verbose logging for project creation";
-        value = 3;
+        value = "j";
     }
 
     named color {
         type = int;
-        options = .3, .3e-9;
+        options = 3, 4;
     }
 
 }

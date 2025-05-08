@@ -1,7 +1,7 @@
 use crate::common::tokens::TokenKind;
 
 #[derive(Debug)]
-pub struct Statement {
+pub struct Assignment {
     pub key: String,
     pub value: String,
     pub kind: TokenKind,
@@ -12,6 +12,6 @@ pub struct Statement {
 pub struct Block {
     pub keyword: String,
     pub identifiers: Vec<String>,
-    pub statements: Vec<Statement>,
+    pub assignments: Vec<Assignment>,
     pub blocks: Vec<Block>,
 }

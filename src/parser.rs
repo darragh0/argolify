@@ -1,11 +1,12 @@
 use crate::{
-    ast::{Block, Statement},
+    ast::{Assignment, Block},
     common::errors::{
         Loc, ParseError, ParseError::*, SemanticError, SyntaxError, print_semantic_tip,
     },
-    common::tokens::{Token, TokenKind, fmt_statement_kinds, is_statement_kind},
+    common::tokens::{Token, TokenKind, fmt_assignment_kinds, is_assignment_kind},
     tokenizer::tokenize,
 };
+use colored::Colorize;
 use std::collections::HashSet;
 use std::fs;
 use std::iter::Peekable;
@@ -25,7 +26,7 @@ impl<'a> Parser<'a> {
         let root = Block {
             keyword: "root".into(),
             identifiers: Vec::new(),
-            statements: Vec::new(),
+            assignments: Vec::new(),
             blocks: Vec::new(),
         };
 
@@ -41,7 +42,7 @@ impl<'a> Parser<'a> {
         while let Some(&tok) = self.tokens.peek() {
             has_tok = true;
             match tok.kind {
-                TokenKind::Directive => self.parse_statement(tok, true, None)?,
+                TokenKind::Directive => self.parse_assignment(tok, true, None)?,
                 TokenKind::Keyword => self.parse_block(tok, None)?,
                 _ => {
                     let loc = self.get_loc(tok);
@@ -148,7 +149,7 @@ impl<'a> Parser<'a> {
                 short_names,
             )))
         } else if !duplicate_names.is_empty() {
-            Err(Semantic(SemanticError::DuplicateName(
+            Err(Semantic(SemanticError::DuplicateArgNames(
                 error_loc.unwrap(),
                 duplicate_names,
             )))
@@ -165,7 +166,7 @@ impl<'a> Parser<'a> {
         let mut block = Block {
             keyword: kw_tok.lexeme.clone(),
             identifiers: Vec::new(),
-            statements: Vec::new(),
+            assignments: Vec::new(),
             blocks: Vec::new(),
         };
 
@@ -185,7 +186,7 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 TokenKind::Identifier => {
-                    self.parse_statement(tok, false, Some(&mut block))?;
+                    self.parse_assignment(tok, false, Some(&mut block))?;
                     empty_block = false;
                 }
                 TokenKind::Keyword => {
@@ -228,7 +229,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_statement(
+    fn parse_assignment(
         &mut self,
         ident_tok: &Token,
         is_dir: bool,
@@ -248,17 +249,16 @@ impl<'a> Parser<'a> {
 
         let mut str_vals: Vec<String> = Vec::new();
         let mut val_kind: Option<TokenKind> = None;
-        let mut statement: Option<Statement> = None;
+        let mut assignment: Option<Assignment> = None;
 
         while let Some(&tok) = self.tokens.peek() {
             let is_str = tok.kind == TokenKind::String;
             if is_dir && !is_str {
                 let loc = self.get_loc(tok);
                 let msg = format!(
-                    "Expected {} after {} for a {} assignment, but got {}: {}",
+                    "Expected {} after {} for a directive assignment, but got {}: {}",
                     TokenKind::String,
                     TokenKind::Eq,
-                    ident_kind,
                     tok.kind,
                     tok
                 );
@@ -267,7 +267,7 @@ impl<'a> Parser<'a> {
                 self.expect_semicolon()?;
                 self.tokens.next();
 
-                statement = Some(Statement {
+                assignment = Some(Assignment {
                     key: ident_tok.lexeme.clone(),
                     value: tok.lexeme.clone(),
                     ident_kind,
@@ -282,7 +282,7 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            if !is_statement_kind(&tok.kind) && prev_tok.kind == TokenKind::Comma {
+            if !is_assignment_kind(&tok.kind) && prev_tok.kind == TokenKind::Comma {
                 let loc = self.get_loc(tok);
                 if let Some(vkind) = val_kind {
                     let msg = format!(
@@ -298,7 +298,7 @@ impl<'a> Parser<'a> {
 
             let is_sc = tok.kind == TokenKind::SemiColon;
             if is_sc && !str_vals.is_empty() {
-                statement = Some(Statement {
+                assignment = Some(Assignment {
                     key: ident_tok.lexeme.clone(),
                     value: str_vals.join(","),
                     kind: val_kind.unwrap(),
@@ -309,14 +309,16 @@ impl<'a> Parser<'a> {
             }
 
             if let Some(vkind) = val_kind {
-                if !is_sc && tok.kind != vkind {
+                if !is_sc && tok.kind != vkind
+                    || prev_tok.kind != TokenKind::Comma && tok.kind == vkind
+                {
                     if prev_tok.kind == TokenKind::Comma {
                         let loc = self.get_loc(tok);
                         let msg = format!(
                             "Expected {} value after comma, but got {}: {}",
                             vkind, tok.kind, tok
                         );
-                        return Err(Semantic(SemanticError::DiffOptionTypes(loc, msg)));
+                        return Err(Syntax(SyntaxError::UnexpectedToken(loc, msg)));
                     } else {
                         let mut loc = self.get_loc(&prev_tok);
                         loc.col += prev_tok.len() - 1;
@@ -332,14 +334,14 @@ impl<'a> Parser<'a> {
                 val_kind = Some(tok.kind);
             }
 
-            if !is_statement_kind(&tok.kind) {
+            if !is_assignment_kind(&tok.kind) {
                 let loc = self.get_loc(tok);
                 let msg = format!(
-                    "Expected one of the following after {} for a {} assignment (got {}): {}",
+                    "Expected one of the following after {} for an assignment {} got {} {}",
                     prev_tok.kind,
-                    ident_kind,
+                    "->".bold(),
                     &tok.kind,
-                    fmt_statement_kinds()
+                    fmt_assignment_kinds()
                 );
 
                 return Err(Syntax(SyntaxError::UnexpectedToken(loc, msg)));
@@ -347,7 +349,7 @@ impl<'a> Parser<'a> {
 
             if prev_tok.kind == TokenKind::Comma && str_vals.is_empty() {
                 let loc = self.get_loc(&prev_tok);
-                let msg = format!("Redundant comma before value in {} assignment", ident_kind);
+                let msg = "Redundant comma before value in assignment".to_string();
                 print_semantic_tip(&loc, msg);
             }
 
@@ -357,9 +359,9 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(p) = parent {
-            p.statements.push(statement.unwrap());
+            p.assignments.push(assignment.unwrap());
         } else {
-            self.root.statements.push(statement.unwrap());
+            self.root.assignments.push(assignment.unwrap());
         }
 
         Ok(())
@@ -368,10 +370,7 @@ impl<'a> Parser<'a> {
     fn expect_semicolon(&mut self) -> Result<(), ParseError> {
         self.expect_next(
             TokenKind::SemiColon,
-            format!(
-                "Missing {} to end assignment statement",
-                TokenKind::SemiColon,
-            ),
+            format!("Missing {} to end assignment", TokenKind::SemiColon,),
         )?;
         Ok(())
     }
